@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Audit Dashboard</title>
+
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f9;
+      margin: 40px;
+      color: #333;
+    }
+
+    h1 {
+      color: #00338D;
+      margin-bottom: 5px;
+    }
+
+    /* KPI Cards */
+    .kpi-row {
+      display: flex;
+      gap: 20px;
+      margin: 25px 0;
+    }
+
+    .kpi-card {
+      background: white;
+      padding: 18px 25px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+      flex: 1;
+      border-left: 5px solid #00338D;
+    }
+
+    .kpi-card.warning {
+      border-left-color: #d32f2f;
+    }
+
+    .kpi-title {
+      font-size: 13px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .kpi-value {
+      font-size: 26px;
+      font-weight: bold;
+      margin-top: 5px;
+      color: #111;
+    }
+
+    /* Toolbar: Button & Search Box */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 20px 0 10px 0;
+    }
+
+    button {
+      background-color: #00338D;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #002266;
+    }
+
+    /* Search Input Box */
+    .search-box {
+      padding: 9px 15px;
+      width: 280px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .search-box:focus {
+      border-color: #00338D;
+      box-shadow: 0 0 5px rgba(0, 51, 141, 0.2);
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th {
+      background-color: #00338D;
+      color: white;
+      text-align: left;
+      padding: 14px;
+    }
+
+    td {
+      padding: 14px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .status-verified {
+      color: #2e7d32;
+      font-weight: bold;
+    }
+
+    .status-mismatch {
+      color: #d32f2f;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Enterprise Audit System</h1>
+  <p id="systemStatus">Status: Ready for audit scan.</p>
+  
+  <!-- KPI Summary Cards -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-title">Total Records</div>
+      <div class="kpi-value" id="kpiRecords">0</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Total Dollar Volume</div>
+      <div class="kpi-value" id="kpiDollars">$0</div>
+    </div>
+    <div class="kpi-card warning">
+      <div class="kpi-title">Flagged Mismatches</div>
+      <div class="kpi-value" id="kpiFlags">0</div>
+    </div>
+  </div>
+
+  <!-- Controls: Button on Left, Search on Right -->
+  <div class="toolbar">
+    <button id="btnRunAudit">▶ Run Audit Pipeline</button>
+    <input type="text" id="searchInput" class="search-box" placeholder="🔍 Search vendor or invoice...">
+  </div>
+
+  <h2>Ledger Transactions</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Invoice ID</th>
+        <th>Vendor</th>
+        <th>Amount ($)</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <!-- Rows will be injected here automatically by JavaScript -->
+    </tbody>
+  </table>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // 1. Our Audit Dataset (Array of Objects)
+    const transactions = [
+      { id: "INV-001", vendor: "Microsoft Azure", amount: 12000, status: "Verified" },
+      { id: "INV-002", vendor: "Global Logistics Freight", amount: 45000, status: "Mismatch" },
+      { id: "INV-003", vendor: "Amazon Web Services", amount: 28000, status: "Verified" },
+      { id: "INV-004", vendor: "Oracle Cloud ERP", amount: 64000, status: "Verified" },
+      { id: "INV-005", vendor: "Apex Consulting Partners", amount: 19000, status: "Mismatch" }
+    ];
+
+    // Grab elements from the page
+    const tableBody = document.getElementById("tableBody");
+    const searchInput = document.getElementById("searchInput");
+    const btnRun = document.getElementById("btnRunAudit");
+
+    // 2. Function to Render Table Rows
+    function renderTable(data) {
+      tableBody.innerHTML = ""; // Clear existing rows
+
+      data.forEach(function(item) {
+        const row = document.createElement("tr");
+
+        // Set green or red class
+        const statusClass = (item.status === "Verified") ? "status-verified" : "status-mismatch";
+
+        row.innerHTML = `
+          <td><strong>${item.id}</strong></td>
+          <td>${item.vendor}</td>
+          <td>$${item.amount.toLocaleString()}</td>
+          <td class="${statusClass}">${item.status}</td>
+        `;
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    // 3. Run Audit Button (Calculates the Math live)
+    btnRun.addEventListener("click", function() {
+      let totalAmount = 0;
+      let mismatchCount = 0;
+
+      // Loop through all records to calculate sums
+      transactions.forEach(function(item) {
+        totalAmount += item.amount;
+        if (item.status === "Mismatch") {
+          mismatchCount++;
+        }
+      });
+
+      // Update KPI cards with real calculations
+      document.getElementById("kpiRecords").innerText = transactions.length;
+      document.getElementById("kpiDollars").innerText = "$" + totalAmount.toLocaleString();
+      document.getElementById("kpiFlags").innerText = mismatchCount;
+
+      document.getElementById("systemStatus").innerHTML = 
+        `Status: <strong>Audit Run Finished!</strong> ${mismatchCount} records require KPMG compliance review.`;
+      
+      alert(`Audit Complete! Evaluated ${transactions.length} records. Found ${mismatchCount} variances.`);
+    });
+
+    // 4. Live Search Filter
+    searchInput.addEventListener("input", function() {
+      const searchTerm = searchInput.value.toLowerCase();
+
+      // Filter transactions where vendor or ID matches search text
+      const filtered = transactions.filter(function(item) {
+        return item.vendor.toLowerCase().includes(searchTerm) || 
+               item.id.toLowerCase().includes(searchTerm);
+      });
+
+      // Re-render table with filtered items
+      renderTable(filtered);
+    });
+
+    // Initial render when page opens
+    renderTable(transactions);
+  </script>
+
+</body>
+</html>
